@@ -1,0 +1,14 @@
+
+wallet :
+  pk: 9KdY9iVCBRtVPCs1txN35fcsZRj1CHnjwWdPqQaZcewScnKXEUs84eH7MrCP4DuVRWTKg448gP7cz97pL735K1P
+  pay: 200000000
+database :
+  name : data.sqlite
+  path: /Users/jackielee/Desktop/projtmp/
+chain :
+  rpc: https://wandering-broken-resonance.solana-mainnet.quiknode.pro/0a9c2e55d66398580e2dcd272fcccb592816933c/
+  name: Solana
+  key: 
+log:
+  path: /Users/jackielee/Desktop/projtmp/
+  name: robot.log

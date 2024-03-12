@@ -1,0 +1,14 @@
+
+wallet :
+  pk: 
+  pay: 200000000
+database :
+  name : data.sqlite
+  path: /home/ec2-user/shelfrobot/
+chain :
+  rpc: https://wandering-broken-resonance.solana-mainnet.quiknode.pro/0a9c2e55d66398580e2dcd272fcccb592816933c/
+  name: Solana
+  key: 
+log:
+  path: /home/ec2-user/shelfrobot/
+  name: robot.log
