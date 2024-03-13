@@ -61,7 +61,12 @@ func (*JupImpl) Price(targetToken, vsToken string) (decimal.Decimal, error) {
 		return decimal.NewFromInt(0), err
 	}
 
-	data := result["data"].(map[string]interface{})
+	// 这里要判断被封的情况
+	data, ok := result["data"].(map[string]interface{})
+	if !ok {
+		sys.Logger.Println("获取价格出错")
+		return decimal.NewFromInt(0), errors.New("price_got_error")
+	}
 	olen := data[targetToken].(map[string]interface{})
 	price := olen["price"].(float64)
 
