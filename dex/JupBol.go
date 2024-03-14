@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"net/http"
 	"strings"
@@ -223,7 +224,11 @@ func (t *JupImpl) SwapAndSend(input, output string, amountDecimals *big.Int, sli
 		return "", outAmount, err
 	}
 
-	txinfo := swapTxMap["swapTransaction"].(string)
+	txinfo, ok := swapTxMap["swapTransaction"].(string)
+	if !ok {
+		log.Println("TX:ERROR:", transaction)
+		return "", outAmount, errors.New("can_not_get_swap_txinfo")
+	}
 	txLastValidBlockHeight := uint64(swapTxMap["lastValidBlockHeight"].(float64))
 
 	c := solana.NewClient(config.Get("Solana").Rpc)
