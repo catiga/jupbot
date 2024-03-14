@@ -36,7 +36,7 @@ func main() {
 	basePrice := decimal.NewFromInt(0)
 	if err != nil {
 		// logger.Fatal("please refer a regula baseline price")
-		logger.Println("未设置限价，将直接触发买入")
+		logger.Println("TX:SYSCONF:未设置限价，将直接触发买入")
 	} else {
 		if baseLinePrice.Cmp(decimal.NewFromInt(0)) != 1 {
 			logger.Fatal("please refer a regula baseline price")
@@ -48,7 +48,7 @@ func main() {
 
 	pChan := make(chan decimal.Decimal)
 
-	logger.Println("目标token ", targetToken, " 基准价格 ", basePrice.String())
+	logger.Println("TX:SYSCONF:目标token ", targetToken, " 基准价格 ", basePrice.String())
 	var round = false
 	var lastBuyTs = int64(0)
 	var mutex sync.Mutex
@@ -72,11 +72,15 @@ func main() {
 
 	var buyHash, sellHash string
 	var buyStageDiff = 0
+	var lastPrintSellTs = int64(0)
 	for {
 		select {
 		case price := <-pChan:
 			if !ongoing() {
-				logger.Println("当前价格 ", price, " 基准价格 ", basePrice, " 浮动超过 ", price.Sub(basePrice).Abs().Div(price).StringFixed(4), "%", " 交易控制状态：", status())
+				if basePrice.Cmp(decimal.NewFromInt(0)) == 0 {
+					basePrice = price
+				}
+				logger.Println("TX:SYSCONF:当前价格 ", price, " 基准价格 ", basePrice, " 浮动超过 ", price.Sub(basePrice).Abs().Div(price).StringFixed(4), "%", " 交易控制状态：", status())
 			}
 
 			if status() {
@@ -84,7 +88,7 @@ func main() {
 					buyHash = buy(targetToken, config.GetConfig().Dex.Vstoken, basePrice, price)
 					if ongoing() {
 						basePrice = price
-						logger.Println("修改下次判断交易的基础价格为：", basePrice, " 原基线价格为：", baseLinePrice)
+						logger.Println("TX:SYSCONF:修改下次判断交易的基础价格为：", basePrice, " 原基线价格为：", baseLinePrice)
 						lastBuyTs = time.Now().UnixMilli()
 					}
 				} else {
@@ -93,7 +97,7 @@ func main() {
 						if basePrice.Sub(price).Abs().Div(basePrice).Cmp(decimal.NewFromFloat32(0.06)) == 1 {
 							var oldBasePrice = basePrice
 							basePrice = price.Mul(decimal.NewFromInt(95)).Div(decimal.NewFromInt(100))
-							logger.Println("超过多次询价不符合设置限价，重新设定基础限价。原标准价格：", oldBasePrice, " 新标准价格：", basePrice)
+							logger.Println("TX:SYSCONF:超过多次询价不符合设置限价，重新设定基础限价。原标准价格：", oldBasePrice, " 新标准价格：", basePrice)
 							buyStageDiff = 0
 						}
 					}
@@ -105,16 +109,21 @@ func main() {
 					sellHash = sell(targetToken, config.GetConfig().Dex.Vstoken, price, sellPrice)
 					if !ongoing() {
 						logger.Println("")
-						logger.Println("结束完一轮：")
-						logger.Println("买入hash：", buyHash)
-						logger.Println("卖出hash：", sellHash)
+						logger.Println("TX:ROUNT:结束完一轮：")
+						logger.Println("TX:ROUNT:买入hash：", buyHash)
+						logger.Println("TX:ROUNT:卖出hash：", sellHash)
 						logger.Println("")
 					}
 				} else {
-					if (time.Now().UnixMilli()-lastBuyTs)/1000 > 2*60*60 {
+					if (time.Now().UnixMilli()-lastPrintSellTs)/1000 > 5*60 {
+						logger.Println("TX:SYSCONF:当前价格 ", price, " 基准价格 ", basePrice, " 期望售出 ", sellPrice, " 等待卖出")
+					}
+					tplRange := int64(config.GetConfig().Sys.Tpl)
+					if (time.Now().UnixMilli()-lastBuyTs)/1000 > tplRange*60 {
+						log.Println("TX:SYSCONF:超过交易频率阈值未触发售出，启动止损售出")
 						sell(targetToken, config.GetConfig().Dex.Vstoken, price, sellPrice)
 						if !ongoing() {
-							log.Println("开始启动重置")
+							log.Println("TX:SYSCONF:开始启动重置")
 							pair := reset()
 							if pair != nil {
 								targetToken = pair.Token0Address

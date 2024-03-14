@@ -39,6 +39,7 @@ type Dex struct {
 type Sys struct {
 	Avekey  string
 	Aveauth string
+	Tpl     int
 }
 
 type Config struct {
