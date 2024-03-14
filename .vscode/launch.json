@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}",
-            "args": ["-o", "G3q2zUkuxDCXMnhdBPujjPHPw9UTMDbXqzcc2UHM3jiy", "-s", "So11111111111111111111111111111111111111112", "-p", "0.04108"]
+            "args": ["-o", "G3q2zUkuxDCXMnhdBPujjPHPw9UTMDbXqzcc2UHM3jiy", "-s", "So11111111111111111111111111111111111111112"]
         }
     ]
 }

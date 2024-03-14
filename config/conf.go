@@ -26,8 +26,19 @@ type Log struct {
 }
 
 type Wallet struct {
-	Pk  string `yaml:"pk"`
-	Pay string `yaml:"pk"`
+	Pk string `yaml:"pk"`
+}
+
+type Dex struct {
+	Pay      string `yaml:"pk"`
+	Slippage int    `yaml:"slippage"`
+	Timeout  int
+	Vstoken  string
+}
+
+type Sys struct {
+	Avekey  string
+	Aveauth string
 }
 
 type Config struct {
@@ -35,6 +46,8 @@ type Config struct {
 	Chain    Chain
 	Log      Log
 	Wallet   Wallet
+	Dex      Dex
+	Sys      Sys
 }
 
 var addChain, removeChain, getChain = chainFactory()
@@ -45,7 +58,7 @@ func GetConfig() Config {
 }
 
 func init() {
-	confFilePath := "./config/dev.yml"
+	confFilePath := "../config/dev.yml"
 
 	if configFilePathFromEnv := os.Getenv("DALINK_GO_CONFIG_PATH"); configFilePathFromEnv != "" {
 		confFilePath = configFilePathFromEnv

@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"log"
 	"shelfrobot/config"
 	_ "shelfrobot/database"
 	"shelfrobot/dex"
+	"shelfrobot/surround"
 	"sync"
 	"time"
 
@@ -15,34 +17,40 @@ import (
 
 const usdc = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 
-var buy, sell, status, ongoing = operateSwap()
+var buy, sell, status, ongoing, reset = operateSwap()
 var logger = sys.Logger
 
 func main() {
 	defer sys.LogFile.Close()
 	targetTokenPtr := flag.String("o", "", "The target token")
-	vsTokenPtr := flag.String("s", "", "The versus token")
+	// vsTokenPtr := flag.String("s", "", "The versus token")
 	basePriceStr := flag.String("p", "", "The base price to U")
 
 	flag.Parse()
 
-	if *targetTokenPtr == "" || *vsTokenPtr == "" {
+	if *targetTokenPtr == "" {
 		logger.Fatal("must provide both target token and versus token")
 	}
 
 	baseLinePrice, err := decimal.NewFromString(*basePriceStr)
+	basePrice := decimal.NewFromInt(0)
 	if err != nil {
-		logger.Fatal("please refer a regula baseline price")
+		// logger.Fatal("please refer a regula baseline price")
+		logger.Println("未设置限价，将直接触发买入")
+	} else {
+		if baseLinePrice.Cmp(decimal.NewFromInt(0)) != 1 {
+			logger.Fatal("please refer a regula baseline price")
+		}
+		basePrice = baseLinePrice
 	}
-	if baseLinePrice.Cmp(decimal.NewFromInt(0)) != 1 {
-		logger.Fatal("please refer a regula baseline price")
-	}
-	basePrice := baseLinePrice
+
+	var targetToken = *targetTokenPtr
 
 	pChan := make(chan decimal.Decimal)
 
-	logger.Println("目标token ", *targetTokenPtr, " 基准价格 ", *basePriceStr)
+	logger.Println("目标token ", targetToken, " 基准价格 ", basePrice.String())
 	var round = false
+	var lastBuyTs = int64(0)
 	var mutex sync.Mutex
 
 	go func() {
@@ -52,12 +60,13 @@ func main() {
 				round = true
 				mutex.Unlock()
 				i := dex.GetIns()
-				p, err := i.Price(*targetTokenPtr, usdc)
+				p, err := i.Price(targetToken, usdc)
 
 				if err == nil {
 					pChan <- p
 				}
 			}
+			time.Sleep(1 * time.Second)
 		}
 	}()
 
@@ -66,21 +75,17 @@ func main() {
 	for {
 		select {
 		case price := <-pChan:
-			// if price.Sub(lastPrice).Abs().Div(price).Cmp(rate) != -1 {
-			// 	log.Println("当前价格 ", price, " 基准价格 ", basePrice, " 浮动超过 3%")
-			// }
 			if !ongoing() {
-				logger.Println("当前价格 ", price, " 基准价格 ", basePrice, " 浮动超过 ", price.Sub(basePrice).Abs().Div(price), "%", " 交易控制状态：", status())
+				logger.Println("当前价格 ", price, " 基准价格 ", basePrice, " 浮动超过 ", price.Sub(basePrice).Abs().Div(price).StringFixed(4), "%", " 交易控制状态：", status())
 			}
 
 			if status() {
 				if price.Cmp(basePrice) != 1 {
-					// log.Println("当前价格 ", price, " 低于基准价格 ", basePrice, " 执行买入")
-					buyHash = buy(*targetTokenPtr, *vsTokenPtr, basePrice, price)
+					buyHash = buy(targetToken, config.GetConfig().Dex.Vstoken, basePrice, price)
 					if ongoing() {
-						//说明买入完成, 修改基础基准交易价格
 						basePrice = price
 						logger.Println("修改下次判断交易的基础价格为：", basePrice, " 原基线价格为：", baseLinePrice)
+						lastBuyTs = time.Now().UnixMilli()
 					}
 				} else {
 					buyStageDiff += 1
@@ -93,16 +98,11 @@ func main() {
 						}
 					}
 				}
-				// else {
-				// 	log.Println("价格不符合条件", price, basePrice)
-				// }
 			} else {
-				const uprise = 102
+				const uprise = 105
 				sellPrice := basePrice.Mul(decimal.NewFromInt(uprise)).Div(decimal.NewFromInt(100))
-				// logger.Println("上次购买价格：", basePrice, " 拟售出价格 ", sellPrice, " 当前价格 ", price)
 				if price.Cmp(sellPrice) != -1 {
-					// log.Println("当前价格 ", price, " 高于售出价格 ", sellPrice, " 执行卖出")
-					sellHash = sell(*targetTokenPtr, *vsTokenPtr, price, sellPrice)
+					sellHash = sell(targetToken, config.GetConfig().Dex.Vstoken, price, sellPrice)
 					if !ongoing() {
 						logger.Println("")
 						logger.Println("结束完一轮：")
@@ -110,15 +110,19 @@ func main() {
 						logger.Println("卖出hash：", sellHash)
 						logger.Println("")
 					}
-
-					// if !ongoing() {
-					// 	//说明卖出完成
-					// 	basePrice = sellPrice
-					// }
+				} else {
+					if (time.Now().UnixMilli()-lastBuyTs)/1000 > 2*60*60 {
+						sell(targetToken, config.GetConfig().Dex.Vstoken, price, sellPrice)
+						if !ongoing() {
+							log.Println("开始启动重置")
+							pair := reset()
+							if pair != nil {
+								targetToken = pair.Token0Address
+								basePrice = decimal.NewFromFloat(pair.CurrentPriceUsd)
+							}
+						}
+					}
 				}
-				// else {
-				// 	log.Println("当前价格 ", price, " 拟售出价格 ", sellPrice, " 等待卖出")
-				// }
 			}
 			round = false
 		default:
@@ -131,40 +135,56 @@ func operateSwap() (
 	func(targetToken, vsToken string, basePrice, currentPrice decimal.Decimal) string,
 	func(targetToken, vsToken string, currentPrice, sellPrice decimal.Decimal) string,
 	func() bool,
-	func() bool) {
+	func() bool,
+	func() *surround.AvePair) {
 
 	var allowBuy = true
 	var allowAmount decimal.Decimal
 	var ongoing = false
 
+	reset := func() *surround.AvePair {
+		pair, err := surround.FilterHot()
+		if err != nil {
+			log.Print("尝试更换交易标的错误", err)
+			return nil
+		}
+		allowBuy = true
+		allowAmount = decimal.NewFromInt(0)
+		ongoing = false
+		return pair
+	}
+
 	buy := func(targetToken, vsToken string, basePrice, currentPrice decimal.Decimal) string {
 		allowBuy = false
-		logger.Println("执行买入并修改为禁止买入状态", allowBuy)
+		logger.Println("TX:BUY_FLAG:执行买入并修改为禁止买入状态", allowBuy)
 
-		var examount, _ = decimal.NewFromString(config.GetConfig().Wallet.Pay)
+		var examount, _ = decimal.NewFromString(config.GetConfig().Dex.Pay)
 
 		i := dex.GetIns()
-		txhash, estimateAmount, e := i.SwapAndSend(vsToken, targetToken, examount.BigInt(), 100)
+		txhash, estimateAmount, e := i.SwapAndSend(vsToken, targetToken, examount.BigInt(), config.GetConfig().Dex.Slippage)
 
 		if e != nil {
 			allowBuy = true
-			logger.Println("执行买入交易出错：", e)
+			logger.Println("TX:BUY_ERROR:执行买入交易出错：", e)
 			return txhash
 		}
 		if len(txhash) == 0 {
 			allowBuy = true
-			logger.Println("执行买入交易出错：", e)
+			logger.Println("TX:BUY_ERROR:执行买入交易出错：", e)
 			return txhash
 		}
-		logger.Println("买入交易签名：", txhash)
+		logger.Println("TX:BUY_FLAG:买入交易签名：", txhash)
+		if len(txhash) == 0 {
+			logger.Println("TX:BUY_ERROR:买入交易HASH未获取到")
+			return txhash
+		}
 
 		checkNum := 0
-		// var realAmount = decimal.NewFromInt(0)
 		for {
 			result, realAmount, e := i.IsTxSuccess(targetToken, txhash)
 			if e != nil {
 				allowBuy = true
-				logger.Println("交易确认出错：", e)
+				logger.Println("TX:BUY_ERROR:交易确认出错：", e)
 				break
 			}
 			if result == "success" {
@@ -172,15 +192,15 @@ func operateSwap() (
 				break
 			}
 
-			if checkNum += 1; checkNum > 90 {
-				logger.Println("交易检查超过阈值，交易失败，重置状态")
+			if checkNum += 1; checkNum > config.GetConfig().Dex.Timeout {
+				logger.Println("TX:BUY_ERROR:交易检查超过阈值，交易失败，重置状态")
 				allowBuy = true
 				break
 			}
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 		}
 		if !allowBuy {
-			logger.Println("当前价格 ", currentPrice, " 低于基准价格 ", basePrice, " 买入完成, 预估数量：", estimateAmount, " 实际数量：", allowAmount)
+			logger.Println("TX:BUY_SUCCESS:当前价格 ", currentPrice, " 低于基准价格 ", basePrice, " 买入完成, 预估数量：", estimateAmount, " 实际数量：", allowAmount)
 			ongoing = true
 		}
 		return txhash
@@ -191,14 +211,14 @@ func operateSwap() (
 			return ""
 		}
 		i := dex.GetIns()
-		txhash, _, e := i.SwapAndSend(targetToken, vsToken, allowAmount.BigInt(), 100)
+		txhash, _, e := i.SwapAndSend(targetToken, vsToken, allowAmount.BigInt(), config.GetConfig().Dex.Slippage)
 		if e != nil {
-			logger.Println("执行卖出交易出错：", e)
+			logger.Println("TX:SELL_ERROR:执行卖出交易出错：", e)
 			return txhash
 		}
-		logger.Println("卖出交易签名：", txhash)
+		logger.Println("TX:SELL_FLAG:卖出交易签名：", txhash)
 		if len(txhash) == 0 {
-			logger.Println("卖出交易hash未获取到")
+			logger.Println("TX:SELL_ERROR:卖出交易HASH未获取到")
 			return txhash
 		}
 
@@ -207,8 +227,7 @@ func operateSwap() (
 		for {
 			result, _, e := i.IsTxSuccess(targetToken, txhash)
 			if e != nil {
-				// allowBuy = true
-				logger.Println("卖出交易确认出错：", e)
+				logger.Println("TX:SELL_ERROR:卖出交易确认出错：", e)
 				break
 			}
 			if result == "success" {
@@ -218,22 +237,17 @@ func operateSwap() (
 				break
 			}
 
-			if checkNum += 1; checkNum > 90 {
-				logger.Println("交易检查超过阈值，交易失败，继续等待卖出 ", allowBuy, allowAmount)
-				// allowBuy = true
+			if checkNum += 1; checkNum > config.GetConfig().Dex.Timeout {
+				logger.Println("TX:SELL_ERROR:交易检查超过阈值，交易失败，继续等待卖出 ", allowBuy, allowAmount)
 				break
 			}
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 		}
 		if sellSuccess {
-			logger.Println("当前价格 ", currentPrice, " 高于售出价格 ", sellPrice, " 卖出完成")
+			logger.Println("TX:SELL_SUCCESS:当前价格 ", currentPrice, " 高于售出价格 ", sellPrice, " 卖出完成")
 			ongoing = false
 		}
 		return txhash
-
-		// if !ongoing {
-		// 	logger.Fatal("执行完一个循环，退出程序，检查数据")
-		// }
 	}
 
 	status := func() bool {
@@ -244,5 +258,5 @@ func operateSwap() (
 		return ongoing
 	}
 
-	return buy, sell, status, ongo
+	return buy, sell, status, ongo, reset
 }

@@ -19,7 +19,7 @@ func TestQuote(t *testing.T) {
 
 	i.Price("DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")
 
-	i.IsTxSuccess("G3q2zUkuxDCXMnhdBPujjPHPw9UTMDbXqzcc2UHM3jiy", "W2979nva1y6o3UTs3LtpF7s42fkBXUdWB45X5CWih8vnxsFSSUFuWSmcnWXtrygYgN3Vc8ksgq6sLHyUHfNXAaJ")
+	i.IsTxSuccess("G3q2zUkuxDCXMnhdBPujjPHPw9UTMDbXqzcc2UHM3jiy", "4Tab4JyiUeDGd35GtvYB7NsuVmRrGSvM9F97uwLzRSmtnKbhc9GzshQwipUpv8DntconCRBbXUwmSM4c8qgZqTzT")
 
 	// txhash, amount, err := i.SwapAndSend("So11111111111111111111111111111111111111112", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", big.NewInt(1000000), 100)
 
