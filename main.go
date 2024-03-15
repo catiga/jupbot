@@ -189,6 +189,23 @@ func operateSwap() (
 
 		checkNum := 0
 		for {
+			if checkNum += 1; checkNum > config.GetConfig().Dex.Timeout {
+				logger.Println("TX:BUY_ERROR:交易检查超过阈值，重置状态, 重置次数:", checkNum)
+				allowBuy = true
+				break
+			}
+
+			e := i.GetMemTx(txhash)
+			if e != nil {
+				if e.Error() == "dropped" {
+					//交易失败
+					logger.Println("TX:BUY_ERROR:交易失败，重置状态")
+					allowBuy = true
+					break
+				} else {
+					continue
+				}
+			}
 			result, realAmount, e := i.IsTxSuccess(targetToken, txhash)
 			if e != nil {
 				allowBuy = true
@@ -200,11 +217,6 @@ func operateSwap() (
 				break
 			}
 
-			if checkNum += 1; checkNum > config.GetConfig().Dex.Timeout {
-				logger.Println("TX:BUY_ERROR:交易检查超过阈值，交易失败，重置状态")
-				allowBuy = true
-				break
-			}
 			time.Sleep(50 * time.Millisecond)
 		}
 		if !allowBuy {
@@ -233,6 +245,21 @@ func operateSwap() (
 		checkNum := 0
 		var sellSuccess = false
 		for {
+			if checkNum += 1; checkNum > config.GetConfig().Dex.Timeout {
+				logger.Println("TX:SELL_ERROR:交易检查超过阈值，交易失败，继续等待卖出 ", allowBuy, allowAmount)
+				break
+			}
+			e := i.GetMemTx(txhash)
+			if e != nil {
+				if e.Error() == "dropped" {
+					//交易失败
+					logger.Println("TX:SELL_ERROR:交易失败，重置状态")
+					allowBuy = true
+					break
+				} else {
+					continue
+				}
+			}
 			result, _, e := i.IsTxSuccess(targetToken, txhash)
 			if e != nil {
 				logger.Println("TX:SELL_ERROR:卖出交易确认出错：", e)
@@ -242,11 +269,6 @@ func operateSwap() (
 				allowBuy = true
 				allowAmount = decimal.NewFromInt(0)
 				sellSuccess = true
-				break
-			}
-
-			if checkNum += 1; checkNum > config.GetConfig().Dex.Timeout {
-				logger.Println("TX:SELL_ERROR:交易检查超过阈值，交易失败，继续等待卖出 ", allowBuy, allowAmount)
 				break
 			}
 			time.Sleep(50 * time.Millisecond)

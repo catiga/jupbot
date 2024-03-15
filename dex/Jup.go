@@ -16,7 +16,7 @@ type Jup interface {
 	Swap(input, output string, amountDecimals *big.Int, slippage int) (string, decimal.Decimal, error)
 	Tokens() ([]string, error)
 	SwapAndSend(input, output string, amountDecimals *big.Int, slippage int) (string, decimal.Decimal, error)
-	GetMemTx(signatures []string) (interface{}, error)
+	GetMemTx(signature string) error
 	IsTxSuccess(targetToken, signature string) (string, decimal.Decimal, error)
 }
 

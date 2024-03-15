@@ -211,30 +211,23 @@ func (t *JupImpl) Swap(input, output string, amountDecimals *big.Int, slippage i
 
 func (t *JupImpl) SwapAndSend(input, output string, amountDecimals *big.Int, slippage int) (string, decimal.Decimal, error) {
 	transaction, outAmount, err := t.Swap(input, output, amountDecimals, slippage)
-
 	if err != nil {
 		sys.Logger.Println(err)
 		return "", outAmount, err
 	}
-
 	var swapTxMap map[string]interface{}
 	err = json.Unmarshal([]byte(transaction), &swapTxMap)
 	if err != nil {
 		return "", outAmount, err
 	}
-
 	txinfo, ok := swapTxMap["swapTransaction"].(string)
 	if !ok {
 		sys.Logger.Println("TX:ERROR:", transaction)
 		return "", outAmount, errors.New("can_not_get_swap_txinfo")
 	}
-	// txLastValidBlockHeight := uint64(swapTxMap["lastValidBlockHeight"].(float64))
-
 	signer := t.account
 	b, _ := base64.StdEncoding.DecodeString(txinfo)
-
 	c := solana.NewClient(config.Get("Solana").Rpc)
-
 	var transactionSignature, txss string
 	var txerror error
 	for i := 0; i < 5; i++ {
@@ -245,7 +238,6 @@ func (t *JupImpl) SwapAndSend(input, output string, amountDecimals *big.Int, sli
 		if err != nil {
 			return "", outAmount, err
 		}
-
 		tx.Message.RecentBlockHash = blockHash.Value.Blockhash
 		serializedMessage, _ := tx.Message.Serialize()
 		signature := signer.Sign(serializedMessage)
@@ -253,24 +245,20 @@ func (t *JupImpl) SwapAndSend(input, output string, amountDecimals *big.Int, sli
 		if err != nil {
 			return "", outAmount, err
 		}
-
 		transactionSignature, txerror = c.SendTransactionWithConfig(context.Background(), tx, solana.SendTransactionConfig{
 			MaxRetries: 3,
 		})
-
 		if txerror == nil && len(transactionSignature) > 0 {
 			txs, _ := tx.Serialize()
 			txss = base64.StdEncoding.EncodeToString(txs)
 			break
 		}
 	}
-
 	sys.Logger.Println("submitted tx base64: ", txss)
 	if txerror != nil {
-		sys.Logger.Printf("failed to send transaction, err: %v, transactionSignature: %s", err, transactionSignature)
+		sys.Logger.Printf("failed to send transaction, err: %v, transactionSignature: %s", txerror, transactionSignature)
 		return "", outAmount, err
 	}
-
 	return transactionSignature, outAmount, nil
 }
 
@@ -354,45 +342,31 @@ func (t *JupImpl) SwapAndSend(input, output string, amountDecimals *big.Int, sli
 // 	return transactionSignature, outAmount, nil
 // }
 
-func (t *JupImpl) GetMemTx(signatures []string) (interface{}, error) {
-
+func (t *JupImpl) GetMemTx(signature string) error {
 	c := solana.NewClient(config.Get("Solana").Rpc)
-	status, err := c.GetSignatureStatusesWithConfig(context.Background(), signatures, solana.GetSignatureStatusesConfig{
+	status, err := c.GetSignatureStatusesWithConfig(context.Background(), []string{signature}, solana.GetSignatureStatusesConfig{
 		SearchTransactionHistory: true,
 	})
-	if len(status) == 0 && err == nil {
-		return nil, errors.New("transactions might be dropped")
-	} else if status == nil && err != nil {
-		return nil, err
+	if err != nil {
+		return err
 	}
-	return status, nil
+	if len(status) == 0 || status[0] == nil {
+		return errors.New("waiting")
+	}
+	realStatus := status[0]
+
+	if realStatus.Err != nil {
+		return errors.New("dropped")
+	}
+
+	if *realStatus.ConfirmationStatus == rpc.CommitmentFinalized {
+		return nil
+	}
+	return errors.New("waiting")
 }
 
 func (t *JupImpl) IsTxSuccess(targetToken, signature string) (string, decimal.Decimal, error) {
 	c := solana.NewClient(config.Get("Solana").Rpc)
-	// c := solana.NewClient("https://api.mainnet-beta.solana.com")
-	// status, e := c.GetSignatureStatus(context.Background(), signature)
-
-	// if e != nil {
-	// 	return "error", e
-	// }
-
-	// if status == nil {
-	// 	return "waiting", nil
-	// }
-
-	// if *status.ConfirmationStatus == rpc.CommitmentFinalized || *status.ConfirmationStatus == rpc.CommitmentConfirmed {
-	// 	tx, _ := c.GetTransaction(context.Background(), signature)
-	// 	if tx == nil {
-	// 		return "waiting", nil
-	// 	}
-
-	// 	if tx.Meta.Err != nil {
-	// 		sys.Logger.Println("交易详情内的错误：", tx.Meta.Err)
-	// 		return "error", errors.New("tx.Meta.Err")
-	// 	}
-	// 	return "success", nil
-	// }
 
 	tx, e := c.GetTransaction(context.Background(), signature)
 

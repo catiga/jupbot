@@ -60,7 +60,7 @@ func GetConfig() Config {
 }
 
 func init() {
-	confFilePath := "./config/dev.yml"
+	confFilePath := "../config/dev.yml"
 
 	if configFilePathFromEnv := os.Getenv("DALINK_GO_CONFIG_PATH"); configFilePathFromEnv != "" {
 		confFilePath = configFilePathFromEnv
