@@ -32,6 +32,7 @@ type Wallet struct {
 type Dex struct {
 	Pay      string `yaml:"pk"`
 	Slippage int    `yaml:"slippage"`
+	Increase int
 	Timeout  int
 	Vstoken  string
 }
@@ -59,7 +60,7 @@ func GetConfig() Config {
 }
 
 func init() {
-	confFilePath := "../config/dev.yml"
+	confFilePath := "./config/dev.yml"
 
 	if configFilePathFromEnv := os.Getenv("DALINK_GO_CONFIG_PATH"); configFilePathFromEnv != "" {
 		confFilePath = configFilePathFromEnv

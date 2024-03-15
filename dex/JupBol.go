@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/big"
 	"net/http"
 	"strings"
@@ -226,69 +225,134 @@ func (t *JupImpl) SwapAndSend(input, output string, amountDecimals *big.Int, sli
 
 	txinfo, ok := swapTxMap["swapTransaction"].(string)
 	if !ok {
-		log.Println("TX:ERROR:", transaction)
+		sys.Logger.Println("TX:ERROR:", transaction)
 		return "", outAmount, errors.New("can_not_get_swap_txinfo")
 	}
-	txLastValidBlockHeight := uint64(swapTxMap["lastValidBlockHeight"].(float64))
+	// txLastValidBlockHeight := uint64(swapTxMap["lastValidBlockHeight"].(float64))
+
+	signer := t.account
+	b, _ := base64.StdEncoding.DecodeString(txinfo)
 
 	c := solana.NewClient(config.Get("Solana").Rpc)
 
-	blockHash, err := c.GetLatestBlockhashAndContextWithConfig(context.Background(), solana.GetLatestBlockhashConfig{
-		Commitment: rpc.CommitmentConfirmed,
-	})
-	if err != nil {
-		return "", outAmount, err
-	}
+	var transactionSignature, txss string
+	var txerror error
+	for i := 0; i < 5; i++ {
+		tx, _ := types.TransactionDeserialize(b)
+		blockHash, err := c.GetLatestBlockhashAndContextWithConfig(context.Background(), solana.GetLatestBlockhashConfig{
+			Commitment: rpc.CommitmentFinalized,
+		})
+		if err != nil {
+			return "", outAmount, err
+		}
 
-	b, _ := base64.StdEncoding.DecodeString(txinfo)
-	tx, _ := types.TransactionDeserialize(b)
-	tx.Message.RecentBlockHash = blockHash.Value.Blockhash
+		tx.Message.RecentBlockHash = blockHash.Value.Blockhash
+		serializedMessage, _ := tx.Message.Serialize()
+		signature := signer.Sign(serializedMessage)
+		err = tx.AddSignature(signature)
+		if err != nil {
+			return "", outAmount, err
+		}
 
-	signer := t.account
+		transactionSignature, txerror = c.SendTransactionWithConfig(context.Background(), tx, solana.SendTransactionConfig{
+			MaxRetries: 3,
+		})
 
-	serializedMessage, _ := tx.Message.Serialize()
-
-	signature := signer.Sign(serializedMessage)
-	err = tx.AddSignature(signature)
-	if err != nil {
-		return "", outAmount, err
-	}
-
-	// sebyes, _ := tx.Serialize()
-	// sebytestr := base64.StdEncoding.EncodeToString(sebyes)
-	// log.Println(sebytestr)
-
-	// transactionSimulate, err := c.SimulateTransaction(context.Background(), tx)
-	// log.Println(transactionSimulate, err)
-
-	currentBlockHeight, err := c.RpcClient.GetBlockHeight(context.Background())
-
-	txs, _ := tx.Serialize()
-	txss := base64.StdEncoding.EncodeToString(txs)
-
-	var transactionSignature string
-	for currentBlockHeight.Result < txLastValidBlockHeight {
-		transactionSignature, err = c.SendTransaction(context.Background(), tx)
-		if err == nil {
+		if txerror == nil && len(transactionSignature) > 0 {
+			txs, _ := tx.Serialize()
+			txss = base64.StdEncoding.EncodeToString(txs)
 			break
 		}
-		// log.Println("")
-		// log.Println(currentBlockHeight.Result, " ", txLastValidBlockHeight, err)
-		// log.Println(txss)
-		// log.Println("")
-
-		currentBlockHeight, err = c.RpcClient.GetBlockHeight(context.Background())
-	}
-
-	if err != nil {
-		sys.Logger.Printf("failed to send transaction, err: %v", err)
-		return "", outAmount, err
 	}
 
 	sys.Logger.Println("submitted tx base64: ", txss)
+	if txerror != nil {
+		sys.Logger.Printf("failed to send transaction, err: %v, transactionSignature: %s", err, transactionSignature)
+		return "", outAmount, err
+	}
 
 	return transactionSignature, outAmount, nil
 }
+
+// func (t *JupImpl) SwapAndSend(input, output string, amountDecimals *big.Int, slippage int) (string, decimal.Decimal, error) {
+// 	transaction, outAmount, err := t.Swap(input, output, amountDecimals, slippage)
+
+// 	if err != nil {
+// 		sys.Logger.Println(err)
+// 		return "", outAmount, err
+// 	}
+
+// 	var swapTxMap map[string]interface{}
+// 	err = json.Unmarshal([]byte(transaction), &swapTxMap)
+// 	if err != nil {
+// 		return "", outAmount, err
+// 	}
+
+// 	txinfo, ok := swapTxMap["swapTransaction"].(string)
+// 	if !ok {
+// 		log.Println("TX:ERROR:", transaction)
+// 		return "", outAmount, errors.New("can_not_get_swap_txinfo")
+// 	}
+// 	txLastValidBlockHeight := uint64(swapTxMap["lastValidBlockHeight"].(float64))
+
+// 	c := solana.NewClient(config.Get("Solana").Rpc)
+
+// 	blockHash, err := c.GetLatestBlockhashAndContextWithConfig(context.Background(), solana.GetLatestBlockhashConfig{
+// 		Commitment: rpc.CommitmentConfirmed,
+// 	})
+// 	if err != nil {
+// 		return "", outAmount, err
+// 	}
+
+// 	b, _ := base64.StdEncoding.DecodeString(txinfo)
+// 	tx, _ := types.TransactionDeserialize(b)
+// 	tx.Message.RecentBlockHash = blockHash.Value.Blockhash
+
+// 	signer := t.account
+
+// 	serializedMessage, _ := tx.Message.Serialize()
+
+// 	signature := signer.Sign(serializedMessage)
+// 	err = tx.AddSignature(signature)
+// 	if err != nil {
+// 		return "", outAmount, err
+// 	}
+
+// 	// sebyes, _ := tx.Serialize()
+// 	// sebytestr := base64.StdEncoding.EncodeToString(sebyes)
+// 	// log.Println(sebytestr)
+
+// 	// transactionSimulate, err := c.SimulateTransaction(context.Background(), tx)
+// 	// log.Println(transactionSimulate, err)
+
+// 	currentBlockHeight, err := c.RpcClient.GetBlockHeight(context.Background())
+
+// 	txs, _ := tx.Serialize()
+// 	txss := base64.StdEncoding.EncodeToString(txs)
+
+// 	var transactionSignature string
+// 	for currentBlockHeight.Result < txLastValidBlockHeight {
+// 		transactionSignature, err = c.SendTransaction(context.Background(), tx)
+// 		if err == nil {
+// 			break
+// 		}
+// 		// log.Println("")
+// 		// log.Println(currentBlockHeight.Result, " ", txLastValidBlockHeight, err)
+// 		// log.Println(txss)
+// 		// log.Println("")
+
+// 		currentBlockHeight, err = c.RpcClient.GetBlockHeight(context.Background())
+// 	}
+
+// 	if err != nil {
+// 		sys.Logger.Printf("failed to send transaction, err: %v", err)
+// 		return "", outAmount, err
+// 	}
+
+// 	sys.Logger.Println("submitted tx base64: ", txss)
+
+// 	return transactionSignature, outAmount, nil
+// }
 
 func (t *JupImpl) GetMemTx(signatures []string) (interface{}, error) {
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"shelfrobot/config"
 	_ "shelfrobot/database"
 	"shelfrobot/dex"
@@ -103,7 +102,7 @@ func main() {
 					}
 				}
 			} else {
-				const uprise = 105
+				var uprise = int64(config.GetConfig().Dex.Increase)
 				sellPrice := basePrice.Mul(decimal.NewFromInt(uprise)).Div(decimal.NewFromInt(100))
 				if price.Cmp(sellPrice) != -1 {
 					sellHash = sell(targetToken, config.GetConfig().Dex.Vstoken, price, sellPrice)
@@ -120,10 +119,10 @@ func main() {
 					}
 					tplRange := int64(config.GetConfig().Sys.Tpl)
 					if (time.Now().UnixMilli()-lastBuyTs)/1000 > tplRange*60 {
-						log.Println("TX:SYSCONF:超过交易频率阈值未触发售出，启动止损售出")
+						logger.Println("TX:SYSCONF:超过交易频率阈值未触发售出，启动止损售出")
 						sell(targetToken, config.GetConfig().Dex.Vstoken, price, sellPrice)
 						if !ongoing() {
-							log.Println("TX:SYSCONF:开始启动重置")
+							logger.Println("TX:SYSCONF:开始启动重置")
 							pair := reset()
 							if pair != nil {
 								targetToken = pair.Token0Address
@@ -154,7 +153,7 @@ func operateSwap() (
 	reset := func() *surround.AvePair {
 		pair, err := surround.FilterHot()
 		if err != nil {
-			log.Print("尝试更换交易标的错误", err)
+			logger.Print("尝试更换交易标的错误", err)
 			return nil
 		}
 		allowBuy = true
