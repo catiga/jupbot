@@ -22,7 +22,6 @@ var logger = sys.Logger
 func main() {
 	defer sys.LogFile.Close()
 	targetTokenPtr := flag.String("o", "", "The target token")
-	// vsTokenPtr := flag.String("s", "", "The versus token")
 	basePriceStr := flag.String("p", "", "The base price to U")
 
 	flag.Parse()
@@ -34,7 +33,6 @@ func main() {
 	baseLinePrice, err := decimal.NewFromString(*basePriceStr)
 	basePrice := decimal.NewFromInt(0)
 	if err != nil {
-		// logger.Fatal("please refer a regula baseline price")
 		logger.Println("TX:SYSCONF:未设置限价，将直接触发买入")
 	} else {
 		if baseLinePrice.Cmp(decimal.NewFromInt(0)) != 1 {

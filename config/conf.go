@@ -3,6 +3,8 @@ package config
 import (
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	system "shelfrobot/sys"
 
@@ -59,11 +61,32 @@ func GetConfig() Config {
 	return *systemConfig
 }
 
+func findProjectRoot(currentDir, rootIndicator string) (string, error) {
+	if _, err := os.Stat(filepath.Join(currentDir, rootIndicator)); err == nil {
+		return currentDir, nil
+	}
+	parentDir := filepath.Dir(currentDir)
+	if currentDir == parentDir {
+		return "", os.ErrNotExist
+	}
+	return findProjectRoot(parentDir, rootIndicator)
+}
+
 func init() {
-	confFilePath := "../config/dev.yml"
+	var confFilePath string
 
 	if configFilePathFromEnv := os.Getenv("DALINK_GO_CONFIG_PATH"); configFilePathFromEnv != "" {
 		confFilePath = configFilePathFromEnv
+	} else {
+		_, filename, _, _ := runtime.Caller(0)
+		testDir := filepath.Dir(filename)
+		confFilePath, _ = findProjectRoot(testDir, "__mark__")
+		if len(confFilePath) > 0 {
+			confFilePath += "/config/dev.yml"
+		}
+	}
+	if len(confFilePath) == 0 {
+		log.Fatal("系统根目录初始化失败")
 	}
 
 	viper.SetConfigFile(confFilePath)
