@@ -1,4 +1,4 @@
 .vscode/*
 robot-linux
 
-config/dev.yaml
+config/*.yml
