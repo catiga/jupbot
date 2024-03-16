@@ -1,0 +1,23 @@
+
+wallet :
+  pk: 9KdY9iVCBRtVPCs1txN35fcsZRj1CHnjwWdPqQaZcewScnKXEUs84eH7MrCP4DuVRWTKg448gP7cz97pL735K1P
+database :
+  name : data.sqlite
+  path: /Users/jackielee/Desktop/projtmp/
+chain :
+  rpc: https://wandering-broken-resonance.solana-mainnet.quiknode.pro/0a9c2e55d66398580e2dcd272fcccb592816933c/
+  name: Solana
+  key: 
+log:
+  path: /Users/jackielee/Desktop/projtmp/
+  name: robot.log
+dex: 
+  pay: 5000000
+  slippage: 300
+  increase: 5
+  timeout: 90
+  vstoken: So11111111111111111111111111111111111111112
+sys: 
+  avekey: 0xd17e6bd50b29665d0260318165778d0fb60f4de9c83a8332b559841a43c2e6194709923acdeaf036d3aad75203647730f50e2bd80c3f807657934d8c5cf5a36c1c
+  aveauth: 62c44255b93cb149574f17da7066ac8d1709878000233074022
+  tpl: 120
