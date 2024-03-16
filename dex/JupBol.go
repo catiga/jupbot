@@ -67,7 +67,12 @@ func (*JupImpl) Price(targetToken, vsToken string) (decimal.Decimal, error) {
 		sys.Logger.Println("获取价格出错")
 		return decimal.NewFromInt(0), errors.New("price_got_error")
 	}
-	olen := data[targetToken].(map[string]interface{})
+	targetTokenFace, ok := data[targetToken]
+	if !ok {
+		sys.Logger.Fatal("Jup Unsupport Token")
+		return decimal.NewFromInt(0), errors.New("Jup Unsupport Token")
+	}
+	olen := targetTokenFace.(map[string]interface{})
 	price := olen["price"].(float64)
 
 	return decimal.NewFromFloat(price), nil
