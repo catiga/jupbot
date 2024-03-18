@@ -1,45 +1,38 @@
 package database
 
 import (
-	"database/sql"
 	"log"
 	"os"
+	"time"
 
 	"shelfrobot/config"
+	"shelfrobot/sys"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite驱动程序
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-var sqldb *sql.DB
+var sqldb *gorm.DB
+var logger = sys.Logger
 
-func initializeDB(filePath string) (*sql.DB, error) {
-	// 检查数据库文件是否存在
+func initializeDB(filePath string) (*gorm.DB, error) {
 	firstTimeSetup := false
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		firstTimeSetup = true
 	}
 
-	log.Println("db path:", filePath)
+	logger.Println("db path:", filePath)
 
-	// 打开数据库连接（如果文件不存在，SQLite会自动创建）
-	db, err := sql.Open("sqlite3", filePath)
+	db, err := gorm.Open(sqlite.Open(filePath), &gorm.Config{})
 	if err != nil {
-		return nil, err
+		log.Fatal("failed to connect database", err)
 	}
 
 	// 如果是首次设置，创建表
 	if firstTimeSetup {
-		sqlStmt := `
-        CREATE TABLE IF NOT EXISTS foo (
-            id INTEGER NOT NULL PRIMARY KEY,
-            name TEXT
-        );
-        `
-		_, err = db.Exec(sqlStmt)
-		if err != nil {
-			return nil, err
-		}
-		log.Println("Database and tables created.")
+		db.AutoMigrate(&Transaction{})
+		logger.Println("Database and tables created.")
 	}
 
 	return db, nil
@@ -47,17 +40,40 @@ func initializeDB(filePath string) (*sql.DB, error) {
 
 func init() {
 	sqlConfig := config.GetSqlLite()
-	sqldb, err := initializeDB(sqlConfig.Path + sqlConfig.Name)
+	tmpdb, err := initializeDB(sqlConfig.Path + sqlConfig.Name)
 
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
-	defer sqldb.Close()
-
-	// 从此处开始你的数据库操作，例如插入数据、查询等
-	// ...
+	sqldb = tmpdb
 }
 
-func GetDB() *sql.DB {
+func GetDB() *gorm.DB {
 	return sqldb
+}
+
+func BuyTx(tx *Transaction) {
+	loc, _ := time.LoadLocation("Asia/Shanghai") // 加载UTC+8时区
+	now := time.Now().In(loc)
+	formattedTime := now.Format("2006-01-02 15:04:05")
+
+	tx.TxTime = formattedTime
+	tx.Type = "buy"
+	tx.Chain = "solana"
+	tx.TxChannel = "jup"
+
+	sqldb.Create(tx)
+}
+
+func SellTx(tx *Transaction) {
+	loc, _ := time.LoadLocation("Asia/Shanghai") // 加载UTC+8时区
+	now := time.Now().In(loc)
+	formattedTime := now.Format("2006-01-02 15:04:05")
+
+	tx.TxTime = formattedTime
+	tx.Type = "sell"
+	tx.Chain = "solana"
+	tx.TxChannel = "jup"
+
+	sqldb.Create(tx)
 }

@@ -2,6 +2,7 @@ package surround
 
 import (
 	"shelfrobot/config"
+	"shelfrobot/database"
 	"shelfrobot/dex"
 	"sync"
 	"time"
@@ -48,19 +49,38 @@ func OperateSwap(to config.TargetToken) (
 		i := dex.GetIns()
 		txhash, estimateAmount, e := i.SwapAndSend(vsToken, targetToken, examount.BigInt(), config.GetConfig().Dex.Slippage)
 
+		var txstatus = 0 // 0:ing 1:success 2:error
 		if e != nil {
 			allowBuy = true
 			logger.Println("TX:BUY_ERROR:执行买入交易出错：", e)
-			return txhash
+			// return txhash
+			txstatus = 2
 		}
 		if len(txhash) == 0 {
 			allowBuy = true
 			logger.Println("TX:BUY_ERROR:执行买入交易出错：", e)
-			return txhash
+			// return txhash
+			txstatus = 2
 		}
 		logger.Println("TX:BUY_FLAG:买入交易签名：", txhash)
 		if len(txhash) == 0 {
 			logger.Println("TX:BUY_ERROR:买入交易HASH未获取到")
+			// return txhash
+			txstatus = 2
+		}
+
+		if txstatus == 2 {
+			//存入数据
+			database.BuyTx(&database.Transaction{
+				Txhash:      txhash,
+				TokenCa:     tokenobject.Ca,
+				TokenName:   tokenobject.Name,
+				TokenAmount: "0",
+				EstAmount:   estimateAmount.String(),
+				TxPrice:     currentPrice.String(),
+				BasePrice:   basePrice.String(),
+				Status:      txstatus,
+			})
 			return txhash
 		}
 
@@ -99,6 +119,28 @@ func OperateSwap(to config.TargetToken) (
 		if !allowBuy {
 			logger.Println("TX:BUY_SUCCESS:当前价格 ", currentPrice, " 低于基准价格 ", basePrice, " 买入完成, 预估数量：", estimateAmount, " 实际数量：", allowAmount)
 			ongoing = true
+
+			database.BuyTx(&database.Transaction{
+				Txhash:      txhash,
+				TokenCa:     tokenobject.Ca,
+				TokenName:   tokenobject.Name,
+				TokenAmount: allowAmount.String(),
+				EstAmount:   estimateAmount.String(),
+				TxPrice:     currentPrice.String(),
+				BasePrice:   basePrice.String(),
+				Status:      1,
+			})
+		} else {
+			database.BuyTx(&database.Transaction{
+				Txhash:      txhash,
+				TokenCa:     tokenobject.Ca,
+				TokenName:   tokenobject.Name,
+				TokenAmount: "0",
+				EstAmount:   estimateAmount.String(),
+				TxPrice:     currentPrice.String(),
+				BasePrice:   basePrice.String(),
+				Status:      2,
+			})
 		}
 		return txhash
 	}
@@ -109,13 +151,31 @@ func OperateSwap(to config.TargetToken) (
 		}
 		i := dex.GetIns()
 		txhash, _, e := i.SwapAndSend(targetToken, vsToken, allowAmount.BigInt(), config.GetConfig().Dex.Slippage)
+		var txstatus = 0
 		if e != nil {
 			logger.Println("TX:SELL_ERROR:执行卖出交易出错：", e)
-			return txhash
+			// return txhash
+			txstatus = 2
 		}
 		logger.Println("TX:SELL_FLAG:卖出交易签名：", txhash)
 		if len(txhash) == 0 {
 			logger.Println("TX:SELL_ERROR:卖出交易HASH未获取到")
+			// return txhash
+			txstatus = 2
+		}
+
+		if txstatus == 2 {
+			//存入数据
+			database.SellTx(&database.Transaction{
+				Txhash:      txhash,
+				TokenCa:     tokenobject.Ca,
+				TokenName:   tokenobject.Name,
+				TokenAmount: allowAmount.String(),
+				EstAmount:   allowAmount.String(),
+				TxPrice:     sellPrice.String(),
+				BasePrice:   currentPrice.String(),
+				Status:      txstatus,
+			})
 			return txhash
 		}
 
@@ -153,6 +213,28 @@ func OperateSwap(to config.TargetToken) (
 		if sellSuccess {
 			logger.Println("TX:SELL_SUCCESS:当前价格 ", currentPrice, " 高于售出价格 ", sellPrice, " 卖出完成")
 			ongoing = false
+
+			database.SellTx(&database.Transaction{
+				Txhash:      txhash,
+				TokenCa:     tokenobject.Ca,
+				TokenName:   tokenobject.Name,
+				TokenAmount: allowAmount.String(),
+				EstAmount:   allowAmount.String(),
+				TxPrice:     sellPrice.String(),
+				BasePrice:   currentPrice.String(),
+				Status:      1,
+			})
+		} else {
+			database.BuyTx(&database.Transaction{
+				Txhash:      txhash,
+				TokenCa:     tokenobject.Ca,
+				TokenName:   tokenobject.Name,
+				TokenAmount: allowAmount.String(),
+				EstAmount:   allowAmount.String(),
+				TxPrice:     sellPrice.String(),
+				BasePrice:   currentPrice.String(),
+				Status:      2,
+			})
 		}
 		return txhash
 	}
