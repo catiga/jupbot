@@ -191,7 +191,6 @@ func OperateSwap(to config.TargetToken) (
 				if e.Error() == "dropped" {
 					//交易失败
 					logger.Println("TX:SELL_ERROR:交易失败，重置状态")
-					allowBuy = true
 					break
 				} else {
 					continue
@@ -225,7 +224,7 @@ func OperateSwap(to config.TargetToken) (
 				Status:      1,
 			})
 		} else {
-			database.BuyTx(&database.Transaction{
+			database.SellTx(&database.Transaction{
 				Txhash:      txhash,
 				TokenCa:     tokenobject.Ca,
 				TokenName:   tokenobject.Name,
