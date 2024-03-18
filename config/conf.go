@@ -11,6 +11,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+type TargetToken struct {
+	Name      string
+	Ca        string
+	Initprice float64
+}
+
 type Database struct {
 	Name string `yaml:"name"`
 	Path string `yaml:"path"`
@@ -32,11 +38,12 @@ type Wallet struct {
 }
 
 type Dex struct {
-	Pay      string `yaml:"pk"`
-	Slippage int    `yaml:"slippage"`
-	Increase int
-	Timeout  int
-	Vstoken  string
+	Pay          string `yaml:"pk"`
+	Slippage     int    `yaml:"slippage"`
+	Increase     int
+	Timeout      int
+	Vstoken      string
+	TargetTokens []TargetToken
 }
 
 type Sys struct {
@@ -101,6 +108,9 @@ func init() {
 	if err != nil {
 		log.Fatalf("无法解析配置：%s", err)
 	}
+	// vs := systemConfig.Dex.TargetTokens[0]
+	// vss := vs.Initprice
+	// fmt.Println(vss)
 
 	system.LogFile, err = os.OpenFile(systemConfig.Log.Path+systemConfig.Log.Name, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
