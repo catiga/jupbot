@@ -57,7 +57,7 @@ func main() {
 	portInt := flag.Int("p", 9501, "The Console Port")
 	flag.Parse()
 
-	listenAddr := fmt.Sprintf("localhost:%d", *portInt)
+	listenAddr := fmt.Sprintf("0.0.0.0:%d", *portInt)
 	server, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		logger.Fatal("system error:", err)
