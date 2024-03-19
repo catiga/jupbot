@@ -66,8 +66,10 @@ func main() {
 
 	logger.Printf("Bot starting, and the console port is %d", *portInt)
 
-	tokenobject := config.GetConfig().Dex.TargetTokens[0]
-	go surround.MakeWatch(tokenobject)
+	tokenobjects := config.GetConfig().Dex.TargetTokens
+	for _, v := range tokenobjects {
+		go surround.MakeWatch(v)
+	}
 
 	for {
 		conn, err := server.Accept()
