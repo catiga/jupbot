@@ -277,9 +277,11 @@ func MakeWatch(tokenobject config.TargetToken) {
 
 				if err == nil {
 					pChan <- p
+				} else {
+					logger.Println("TX:SYSCONF:获取价格出错 ", targetToken, err)
 				}
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(2 * time.Second)
 		}
 	}()
 
