@@ -38,13 +38,8 @@ func handleConnection(conn net.Conn) {
 				logger.Println("Exiting Connection.")
 				_ = conn.Close()
 			} else {
-				// 处理命令...
 				router := cmd.NewCommandRouter()
-				// router.Register("showtx", showTxHandler)
 				router.ParseCommands(message)
-
-				// 假设conn是一个建立的网络连接
-				// 示例命令
 				router.Route(conn, message)
 			}
 		}
