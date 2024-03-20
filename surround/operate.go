@@ -14,7 +14,7 @@ import (
 
 var logger = sys.Logger
 
-func OperateSwap(to config.TargetToken) (
+func OperateSwap(confd config.Dex, to config.TargetToken) (
 	func(basePrice, currentPrice decimal.Decimal) string,
 	func(currentPrice, sellPrice decimal.Decimal) string,
 	func() bool,
@@ -26,7 +26,7 @@ func OperateSwap(to config.TargetToken) (
 	var ongoing = false
 	var tokenobject = to
 	var targetToken = tokenobject.Ca
-	var vsToken = config.GetConfig().Dex.Vstoken
+	// var vsToken = config.GetConfig().Dex.Vstoken
 
 	reset := func() *AvePair {
 		pair, err := FilterHot()
@@ -44,10 +44,10 @@ func OperateSwap(to config.TargetToken) (
 		allowBuy = false
 		logger.Println("TX:BUY_FLAG:执行买入并修改为禁止买入状态", allowBuy)
 
-		var examount, _ = decimal.NewFromString(config.GetConfig().Dex.Pay)
+		var examount, _ = decimal.NewFromString(confd.Pay)
 
-		i := dex.GetIns()
-		txhash, estimateAmount, e := i.SwapAndSend(vsToken, targetToken, examount.BigInt(), config.GetConfig().Dex.Slippage)
+		i := dex.GetIns(confd)
+		txhash, estimateAmount, e := i.SwapAndSend(confd.Vstoken, targetToken, examount.BigInt(), confd.Slippage)
 
 		var txstatus = 0 // 0:ing 1:success 2:error
 		if e != nil {
@@ -86,7 +86,7 @@ func OperateSwap(to config.TargetToken) (
 
 		checkNum := 0
 		for {
-			if checkNum += 1; checkNum > config.GetConfig().Dex.Timeout {
+			if checkNum += 1; checkNum > confd.Timeout {
 				logger.Println("TX:BUY_ERROR:交易检查超过阈值，重置状态, 重置次数:", checkNum)
 				allowBuy = true
 				break
@@ -149,8 +149,8 @@ func OperateSwap(to config.TargetToken) (
 		if allowBuy {
 			return ""
 		}
-		i := dex.GetIns()
-		txhash, _, e := i.SwapAndSend(targetToken, vsToken, allowAmount.BigInt(), config.GetConfig().Dex.Slippage)
+		i := dex.GetIns(confd)
+		txhash, _, e := i.SwapAndSend(targetToken, confd.Vstoken, allowAmount.BigInt(), confd.Slippage)
 		var txstatus = 0
 		if e != nil {
 			logger.Println("TX:SELL_ERROR:执行卖出交易出错：", e)
@@ -182,7 +182,7 @@ func OperateSwap(to config.TargetToken) (
 		checkNum := 0
 		var sellSuccess = false
 		for {
-			if checkNum += 1; checkNum > config.GetConfig().Dex.Timeout {
+			if checkNum += 1; checkNum > confd.Timeout {
 				logger.Println("TX:SELL_ERROR:交易检查超过阈值，交易失败，继续等待卖出 ", allowBuy, allowAmount)
 				break
 			}
@@ -251,9 +251,17 @@ func OperateSwap(to config.TargetToken) (
 
 const usdc = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 
-func MakeWatch(tokenobject config.TargetToken) {
+func WatchDex(dex config.Dex) {
+	if len(dex.TargetTokens) > 0 {
+		for _, v := range dex.TargetTokens {
+			go MakeWatch(dex, v)
+		}
+	}
+}
 
-	var buy, sell, status, ongoing, reset = OperateSwap(tokenobject)
+func MakeWatch(confd config.Dex, tokenobject config.TargetToken) {
+
+	var buy, sell, status, ongoing, reset = OperateSwap(confd, tokenobject)
 
 	targetToken := tokenobject.Ca
 	basePrice := decimal.NewFromFloat(tokenobject.Initprice)
@@ -272,7 +280,7 @@ func MakeWatch(tokenobject config.TargetToken) {
 				mutex.Lock()
 				round = true
 				mutex.Unlock()
-				i := dex.GetIns()
+				i := dex.GetIns(confd)
 				p, err := i.Price(targetToken, usdc)
 
 				if err == nil {
@@ -318,7 +326,7 @@ func MakeWatch(tokenobject config.TargetToken) {
 					}
 				}
 			} else {
-				var uprise = int64(config.GetConfig().Dex.Increase)
+				var uprise = int64(confd.Increase)
 				sellPrice := basePrice.Mul(decimal.NewFromInt(uprise)).Div(decimal.NewFromInt(100))
 				if price.Cmp(sellPrice) != -1 {
 					sellHash = sell(price, sellPrice)

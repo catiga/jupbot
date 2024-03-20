@@ -60,10 +60,8 @@ func main() {
 	defer server.Close()
 
 	logger.Printf("Bot starting, and the console port is %d", *portInt)
-
-	tokenobjects := config.GetConfig().Dex.TargetTokens
-	for _, v := range tokenobjects {
-		go surround.MakeWatch(v)
+	for _, v := range config.GetDexes() {
+		go surround.WatchDex(v)
 	}
 
 	for {

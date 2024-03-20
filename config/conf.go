@@ -38,11 +38,15 @@ type Wallet struct {
 }
 
 type Dex struct {
+	Name         string
+	Chain        string
+	Rpc          string
 	Pay          string `yaml:"pk"`
 	Slippage     int    `yaml:"slippage"`
 	Increase     int
 	Timeout      int
 	Vstoken      string
+	Wallet       Wallet
 	TargetTokens []TargetToken
 }
 
@@ -56,9 +60,9 @@ type Config struct {
 	Database Database
 	Chain    Chain
 	Log      Log
-	Wallet   Wallet
-	Dex      Dex
+	Dex      []Dex
 	Sys      Sys
+	// Wallet   Wallet
 }
 
 var addChain, removeChain, getChain = chainFactory()
@@ -66,6 +70,10 @@ var systemConfig = &Config{}
 
 func GetConfig() Config {
 	return *systemConfig
+}
+
+func GetDexes() []Dex {
+	return systemConfig.Dex
 }
 
 func findProjectRoot(currentDir, rootIndicator string) (string, error) {

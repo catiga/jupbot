@@ -1,6 +1,7 @@
 package dex
 
 import (
+	"shelfrobot/config"
 	"testing"
 )
 
@@ -12,7 +13,8 @@ func TestQuote(t *testing.T) {
 		https://explorer.solana.com/tx/2WgLwD7AxfbQfVM3oNQA9UCHb67y2KduNosAKRPtM7ogJXyPrEf2xdNqkHoY7pSR1LVnSVrjPkJtyf7gMXZ5ehT4
 	*/
 
-	i := GetIns()
+	d := config.GetDexes()[0]
+	i := GetIns(d)
 	// v, e := i.Quote("So11111111111111111111111111111111111111112", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", big.NewInt(1000000), 100)
 
 	// fmt.Println(v, e)

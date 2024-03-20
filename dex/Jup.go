@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"shelfrobot/config"
-	"shelfrobot/sys"
 
 	"github.com/shopspring/decimal"
 )
@@ -20,18 +19,25 @@ type Jup interface {
 	IsTxSuccess(targetToken, signature string) (string, decimal.Decimal, error)
 }
 
-var ins Jup
+// func init() {
+// 	ins = &JupImpl{
+// 		userPk: config.GetConfig().Wallet.Pk,
+// 	}
+// 	ins.Init()
+// }
 
-func init() {
-	ins = &JupImpl{
-		userPk: config.GetConfig().Wallet.Pk,
-	}
-	ins.Init()
-}
+var dexHandlers = make(map[string]Jup)
 
-func GetIns() Jup {
-	if ins == nil {
-		sys.Logger.Fatal("unable to init instance...")
+func GetIns(d config.Dex) Jup {
+	ins, ok := dexHandlers[d.Name]
+	if !ok {
+		if d.Chain == "Solana" {
+			ins = &JupImpl{
+				userPk: d.Wallet.Pk,
+			}
+			ins.Init()
+			dexHandlers[d.Name] = ins
+		}
 	}
 	return ins
 }
