@@ -2,3 +2,4 @@
 robot-linux
 
 config/*.yml
+.env
