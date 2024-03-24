@@ -123,13 +123,13 @@ func init() {
 		log.Fatal(err)
 	}
 
+	system.Logger = log.New(system.LogFile, "prefix: ", log.LstdFlags)
+
 	_ = godotenv.Load()
 	if changedPk := os.Getenv("DALINK_PK"); len(changedPk) > 0 {
 		systemConfig.Dex[0].Wallet.Pk = os.Getenv("DALINK_PK")
 		system.Logger.Println("wallet pk changed")
 	}
-
-	system.Logger = log.New(system.LogFile, "prefix: ", log.LstdFlags)
 
 	addChain(systemConfig.Chain)
 
