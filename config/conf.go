@@ -123,12 +123,11 @@ func init() {
 		log.Fatal(err)
 	}
 
-	err = godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	_ = godotenv.Load()
+	if changedPk := os.Getenv("DALINK_PK"); len(changedPk) > 0 {
+		systemConfig.Dex[0].Wallet.Pk = os.Getenv("DALINK_PK")
+		system.Logger.Println("wallet pk changed")
 	}
-	systemConfig.Dex[0].Wallet.Pk = os.Getenv("pk")
-	system.Logger.Println("wallet pk changed")
 
 	system.Logger = log.New(system.LogFile, "prefix: ", log.LstdFlags)
 
