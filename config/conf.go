@@ -8,6 +8,7 @@ import (
 
 	system "shelfrobot/sys"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -116,15 +117,18 @@ func init() {
 	if err != nil {
 		log.Fatalf("无法解析配置：%s", err)
 	}
-	// vs := systemConfig.Dex.TargetTokens[0]
-	// vss := vs.Initprice
-	// fmt.Println(vss)
 
 	system.LogFile, err = os.OpenFile(systemConfig.Log.Path+systemConfig.Log.Name, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// defer logFile.Close()
+
+	err = godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	systemConfig.Dex[0].Wallet.Pk = os.Getenv("pk")
+	system.Logger.Println("wallet pk changed")
 
 	system.Logger = log.New(system.LogFile, "prefix: ", log.LstdFlags)
 
